@@ -72,25 +72,25 @@ class QiwiPaymentSystem extends PaymentSystem
         try {
             $this->requireActiveOutput();
 
-            $login = array_rand($this->activeWallets);
+            $login = array_rand($this->activeWallets); // списываем со случайного валета из пула?
             $result->setAccount($login);
 
             $api = $this->getWalletApi($login);
 
             $wallet = $api->normalizePhoneOrFail($wallet);
-            $amount = $api->normalizeAmountOrFail($amount);
+            $amount = $api->normalizeAmountOrFail($amount); // считаем, что amount проверен и приведен к нужному типу/виду?
             $comment = trim(@(string)$comment);
 
             $balance = $api->getBalance();
-            if ($amount > $balance - $this->balanceMin) {
+            if ($amount > $balance - $this->balanceMin) { // если в несколько потоков, то можем уйти ниже balanceMin без всяких эксепшенов (если для разных потоков не использовать различные wallet-ы или единую систему контроля баланса)
                 throw new LE('Insufficient funds.');
             }
 
             try {
                 $transferResult = $api->transfer($wallet, $amount, $comment);
             } catch (QiwiUncertaintyException $e) {
-                $result->setSuccess();
-                throw $e;
+                $result->setSuccess(); // почему success?
+                throw $e; // тут все должно упасть т.к. ниже ловится Exception, а дерево исключений, похоже, следующее QiwiUncertaintyException <- QiwiException <- \Exception
             }
 
             $result->setExternalId($transferResult->getId());
@@ -99,7 +99,9 @@ class QiwiPaymentSystem extends PaymentSystem
             $result->setFee($transaction->getCommission());
 
             $result->setSuccess();
-        } catch (Exception $e) {
+        } catch (Exception $e) { // если будет выкинут эксепшн унаследованный не от Exception - падаем (у QiwiWalletApi свои эксепшены)
+            // при QiwiUncertaintyException, похоже, сюда не попадем т.к. QiwiUncertaintyException <- QiwiException <- \Exception
+            // но судя по index.php/13 мы, вроде как, хотим именно сюда - установить setSuccess и setFailure
             $result->setFailure($e->getMessage(), $e);
         }
 
@@ -117,7 +119,7 @@ class QiwiPaymentSystem extends PaymentSystem
         foreach ($this->activeWallets as $login => $wallet) {
             try {
                 $balance = $this->getWalletApi($login)->getBalance();
-            } catch (Exception $e) {
+            } catch (Exception $e) { // опять же эксепшены Qiwi не ловим, ловим только наследованные от Exception
                 $balance = null;
             }
             $balances[$login] = $balance;
