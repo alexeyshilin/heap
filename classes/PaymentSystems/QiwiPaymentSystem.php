@@ -87,7 +87,7 @@ class QiwiPaymentSystem extends PaymentSystem
             }
 
             try {
-                $transferResult = $api->transfer($wallet, $amount, $comment);
+                $transferResult = $api->transfer($wallet, $amount, $comment); // transfer перевод всегда в одной валюте, если вдруг Currency будет не рубли, то переведем не то что нужно
             } catch (QiwiUncertaintyException $e) {
                 $result->setSuccess(); // почему success?
                 throw $e; // тут все должно упасть т.к. ниже ловится Exception, а дерево исключений, похоже, следующее QiwiUncertaintyException <- QiwiException <- \Exception
@@ -97,6 +97,7 @@ class QiwiPaymentSystem extends PaymentSystem
 
             $transaction = $api->getTransaction($transferResult->getId(), QiwiWalletApi::TXN_TYPE_OUT);
             $result->setFee($transaction->getCommission());
+            // возможно, нужна проверка статуса транзакции, если финальный статус операции будет именно здесь в транзакции
 
             $result->setSuccess();
         } catch (Exception $e) { // если будет выкинут эксепшн унаследованный не от Exception - падаем (у QiwiWalletApi свои эксепшены)
